@@ -19,9 +19,9 @@ the paper, the palette, the camera and the timeline.
 
 ![a hand-written composition](docs/frei.gif)
 
-Above: a tall sheet the camera descends, one subject running continuously
-through several sections, labels pointing into it with arrows, a zoom, a stamp.
-No grid involved.
+Above: a tall sheet the camera descends — drawn shapes, labels pointing into
+them with arrows, a zoom, a pull-out at the end. No grid involved, and the
+whole thing is about thirty lines of `szene.js`.
 
 ![the whole sheet](docs/frei-blatt.png)
 
