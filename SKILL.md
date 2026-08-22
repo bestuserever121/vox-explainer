@@ -17,6 +17,16 @@ Everything lives in one `spec.json`. Panels are laid out on a grid in a snake
 path; arrows between them are drawn automatically; `schluss` pulls the camera
 out to show the whole sheet.
 
+## Styles
+
+`"stil"` in the spec switches the whole look: `papier` (warm off-white, creases,
+print misregistration), `dunkel` (near-black, glowing type), `blaupause` (graph
+paper, technical), `riso` (cream, heavy duotone offset). Palette names are
+identical across styles, so switching never means touching the panels.
+
+**A `palette` block in the spec overrides the style.** If a style switch appears
+to do nothing, that is why.
+
 ## How to approach a video
 
 **Measure the reference before copying it.** If the user points at an example,
@@ -57,6 +67,8 @@ verified, use a label instead of inventing one — or attribute it in the kicker
   zooms out.
 - **A camera move needs a start *and* an end.** Giving only the target makes
   every move jump.
+- **Dark styles need inverted photos.** Black halftone dots on a black ground
+  are invisible; `vox.py` sets this from the style, `fotos_negativ` overrides.
 
 ## Checking the result
 

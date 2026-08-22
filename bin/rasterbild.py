@@ -55,6 +55,8 @@ def main():
     ap.add_argument("--aufhellen", type=float, default=0.18)
     ap.add_argument("--breite", type=int, default=900)
     ap.add_argument("--versatz", type=int, default=2, help="Farbversatz in Pixeln")
+    ap.add_argument("--negativ", action="store_true",
+                    help="helle Punkte auf dunkel - fuer dunkle Stile")
     a = ap.parse_args()
 
     im = Image.open(a.ein)
@@ -91,6 +93,11 @@ def main():
         versetzt.paste(lage, (dx, dy))
         stapel = np.minimum(stapel, np.array(versetzt))
     aus = Image.fromarray(stapel)
+
+    if a.negativ:
+        # Schwarze Rasterpunkte auf dunklem Grund sieht niemand. Umkehren
+        # macht daraus eine helle Figur, die auf Dunkel steht.
+        aus = ImageOps.invert(aus)
 
     if hat_alpha:
         # Die Maske eine Spur schrumpfen, sonst bleibt ein heller Saum stehen.

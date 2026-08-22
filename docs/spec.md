@@ -10,8 +10,10 @@ One JSON file describes the whole video.
 | `masse` | `[width, height]` in pixels |
 | `fps` | frames per second |
 | `dauer` | total length in seconds |
+| `stil` | `papier` · `dunkel` · `blaupause` · `riso` (default `papier`) |
 | `raster` | `[columns, rows]` of panels |
-| `palette` | colour names used by the panels (see below) |
+| `palette` | overrides for the style's colours — omit unless you mean it |
+| `fotos_negativ` | invert the halftone photos (defaults from the style) |
 | `felder` | the panels, in the order the camera visits them |
 | `schluss` | `{ "bei": <s>, "dauer": <s> }` — pull out to the whole sheet |
 | `ton` | audio settings |
@@ -19,11 +21,27 @@ One JSON file describes the whole video.
 Panels are placed in a snake path: left to right, down, right to left, down …
 Arrows between consecutive panels are drawn automatically.
 
-## Palette
+## Styles and palette
+
+Each style ships a full palette under the same names, so switching `stil` never
+requires touching the panels:
 
 `papier` `tinte` `gedeckt` `gelb` `koralle` `lila` `gold`, plus the font
 families `anzeige` (display) and `text`. Any panel field that takes a colour
 accepts either a palette name or a raw CSS colour.
+
+**A `palette` block in the spec overrides the style.** Ship one only when you
+actually want to deviate — a full palette silently disables the style switch.
+
+| style | ground | type treatment | texture |
+|---|---|---|---|
+| `papier` | warm off-white | print misregistration | creases + grain |
+| `dunkel` | near-black | glow | soft colour clouds |
+| `blaupause` | deep blue | hard drop shadow | graph paper grid |
+| `riso` | cream | heavy duotone offset | strong grain |
+
+Dark styles set `fotos_negativ` automatically — black halftone dots on a black
+ground are invisible.
 
 ## Panels (`felder`)
 

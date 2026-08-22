@@ -42,6 +42,11 @@ def hyperframes_finden():
 
 
 # ---------------------------------------------------------------- Bilder ----
+# Muss zu STILE in vorlage/szene.js passen: welche Stile stehen auf dunklem
+# Grund und brauchen deshalb umgekehrte Rasterfotos.
+DUNKLE_STILE = {"dunkel", "blaupause"}
+
+
 def bilder(projekt: Path, spec):
     """Fotos freistellen und ins Punktraster legen."""
     roh = projekt / "bilder"
@@ -63,8 +68,11 @@ def bilder(projekt: Path, spec):
             eingang = frei if p.returncode == 0 else quelle
             if p.returncode:
                 print(f"  {name}: ohne Freisteller ({p.stderr.strip().splitlines()[0][:60]})")
-            lauf([sys.executable, HIER / "rasterbild.py", eingang, ziel,
-                  "--breite", str(spec.get("rasterbreite", 640))])
+            befehl = [sys.executable, HIER / "rasterbild.py", eingang, ziel,
+                      "--breite", str(spec.get("rasterbreite", 640))]
+            if spec.get("fotos_negativ", spec.get("stil") in DUNKLE_STILE):
+                befehl.append("--negativ")
+            lauf(befehl)
         print(f"  {name} fertig")
 
 

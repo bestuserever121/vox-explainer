@@ -10,6 +10,23 @@ You describe the video in one `spec.json`. Everything else is generated.
 
 ![the full sheet](docs/beispiel-blatt.png)
 
+## Styles
+
+`"stil"` switches the whole look. The palette names stay the same across
+styles, so a spec keeps working when you switch — `"balken": "gelb"` always
+hits that style's warm signal colour.
+
+![styles](docs/stile.png)
+
+`papier` — warm off-white, creases and grain, black type with print
+misregistration · `dunkel` — near-black, glowing type · `blaupause` — graph
+paper, technical · `riso` — cream with heavy duotone offset.
+
+Photos are inverted automatically on the dark styles (black halftone dots on a
+black ground are invisible). Override with `"fotos_negativ": true|false`.
+
+Anything in `palette` overrides the style — leave it out unless you mean it.
+
 ## Why
 
 Bullet points on dark slides *list* claims. This *shows* them: every statement
@@ -51,8 +68,8 @@ Or step by step: `bilder` (prepare photos) · `szene` (render) · `ton` (mix aud
   "masse": [1920, 1080],
   "fps": 30,
   "dauer": 24.0,
+  "stil": "papier",                    // papier | dunkel | blaupause | riso
   "raster": [3, 2],                    // columns × rows of panels
-  "palette": { "papier": "#e9e6e1", "koralle": "#f0664a", "...": "..." },
   "felder": [                          // one panel per claim, in camera order
     { "art": "titel",    "bei": 0.0,  "kicker": "How it works", "titel": "THE CYCLE" },
     { "art": "wort",     "bei": 4.0,  "wort": "PRICES FALL", "balken": "gelb",
