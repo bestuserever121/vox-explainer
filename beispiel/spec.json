@@ -1,0 +1,39 @@
+{
+  "name": "beispiel",
+  "masse": [1920, 1080],
+  "fps": 30,
+  "dauer": 24.0,
+  "raster": [3, 2],
+  "palette": {
+    "papier": "#e9e6e1", "tinte": "#14110f", "gedeckt": "#7a6f66",
+    "gelb": "#f5e050", "koralle": "#f0664a", "lila": "#9b8cf0", "gold": "#c99a1e"
+  },
+  "felder": [
+    { "art": "titel", "bei": 0.0, "kicker": "Wie es funktioniert",
+      "titel": "DER KREISLAUF" },
+
+    { "art": "wort", "bei": 4.0, "kicker": "Schritt eins",
+      "wort": "PREISE FALLEN", "balken": "gelb",
+      "unter": "Immer neue <mark>Rabatte</mark> — die Marge schmilzt.",
+      "unter_bei": 2.4 },
+
+    { "art": "zaehler", "bei": 8.0, "kicker": "Zwei Lager im Vergleich",
+      "reihen": [ { "name": "VORHER", "wert": 8, "max": 8 },
+                  { "name": "NACHHER", "wert": 3, "max": 8 } ] },
+
+    { "art": "umringt", "bei": 12.0, "kicker": "Der Druck steigt",
+      "wort": "VON ALLEN SEITEN", "gegner": 7, "strahl": "lila" },
+
+    { "art": "balken", "bei": 16.0, "kicker": "Was am Ende bleibt",
+      "max": 1.0,
+      "reihen": [ { "name": "UMSATZ", "wert": 1.0, "bei": 1.6, "farbe": "koralle" },
+                  { "name": "GEWINN", "wert": 0.34, "bei": 3.4, "farbe": "gedeckt" } ] },
+
+    { "art": "streuung", "bei": 20.0, "kicker": "Und das überall",
+      "wort": "IM GANZEN MARKT", "punkte": 42 }
+  ],
+
+  "schluss": { "bei": 22.4, "dauer": 1.5 },
+
+  "ton": { "stimme": null, "bett": "ruhig", "ziel_lufs": -14, "abstand": 20 }
+}

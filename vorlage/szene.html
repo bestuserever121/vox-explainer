@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="de" data-resolution="custom">
+<head><meta charset="UTF-8">
+<style id="grundstil"></style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0.000"
+     data-duration="10.000" data-width="1920" data-height="1080">
+  <div id="papier"></div>
+  <div id="buehne"><div id="welt"></div></div>
+  <div id="falten"></div>
+  <svg id="korn" width="1920" height="1080" viewBox="0 0 1920 1080" aria-hidden="true">
+    <filter id="rauschen"><feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4"/>
+      <feColorMatrix type="saturate" values="0"/></filter>
+    <rect width="1920" height="1080" filter="url(#rauschen)"/></svg>
+  <div id="vignette"></div>
+</div>
+
+<!-- Reihenfolge zaehlt: erst GSAP, dann SPEC, dann der Aufbau. -->
+<script src="gsap.min.js"></script>
+<script src="spec.js"></script>
+<script src="szene.js"></script>
+<script>window.__voxAufbau(window.SPEC);</script>
+</body></html>

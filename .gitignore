@@ -1,0 +1,6 @@
+arbeit/
+aus/
+.venv/
+__pycache__/
+*.pyc
+vorlage/gsap.min.js

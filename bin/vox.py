@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+"""vox - Erklaervideos im Papier-Collagen-Stil aus einer Spec-Datei.
+
+    vox.py neu   mein-video/        Projekt mit Beispiel anlegen
+    vox.py bilder mein-video/       Fotos freistellen und rastern
+    vox.py szene  mein-video/       Szene rendern (ohne Ton)
+    vox.py ton    mein-video/       Stimme und Musikbett mischen
+    vox.py bauen  mein-video/       alles nacheinander
+
+Gerendert wird mit HyperFrames (github.com/heygen-com/hyperframes). Pfad wird
+gesucht oder ueber die Umgebungsvariable HYPERFRAMES gesetzt.
+"""
+import argparse, json, math, os, shutil, subprocess, sys, tempfile
+from pathlib import Path
+
+HIER = Path(__file__).resolve().parent
+VORLAGE = HIER.parent / "vorlage"
+BEISPIEL = HIER.parent / "beispiel"
+
+
+def lauf(cmd, **kw):
+    p = subprocess.run([str(c) for c in cmd], capture_output=True, text=True, **kw)
+    if p.returncode:
+        sys.exit(f"fehlgeschlagen: {' '.join(str(c) for c in cmd[:6])} ...\n{p.stderr[-1500:]}")
+    return p
+
+
+def spec_lesen(projekt: Path):
+    weg = projekt / "spec.json"
+    if not weg.exists():
+        sys.exit(f"{weg} fehlt. Anlegen mit:  vox.py neu {projekt}")
+    return json.loads(weg.read_text(encoding="utf-8"))
+
+
+def hyperframes_finden():
+    for p in (os.environ.get("HYPERFRAMES"),
+              Path.home() / "projects/hyperframes/packages/cli/bin/hyperframes.mjs",
+              Path.home() / "hyperframes/packages/cli/bin/hyperframes.mjs"):
+        if p and Path(p).exists():
+            return Path(p)
+    return None
+
+
+# ---------------------------------------------------------------- Bilder ----
+def bilder(projekt: Path, spec):
+    """Fotos freistellen und ins Punktraster legen."""
+    roh = projekt / "bilder"
+    if not roh.is_dir():
+        print("  kein Ordner bilder/ - uebersprungen"); return
+    arbeit = projekt / "arbeit"; arbeit.mkdir(exist_ok=True)
+    gewuenscht = {b["datei"] for f in spec.get("felder", [])
+                  for b in (f.get("bilder") or []) if b.get("datei")}
+    python = os.environ.get("VOX_PYTHON", sys.executable)
+    for name in sorted(gewuenscht):
+        ziel = arbeit / name
+        quelle = next((q for q in roh.glob(Path(name).stem + ".*")), None)
+        if quelle is None:
+            print(f"  {name}: keine Quelle in bilder/ - uebersprungen"); continue
+        with tempfile.TemporaryDirectory() as tmp:
+            frei = Path(tmp) / "frei.png"
+            p = subprocess.run([python, HIER / "freistellen.py", quelle, frei, "--eng"],
+                               capture_output=True, text=True)
+            eingang = frei if p.returncode == 0 else quelle
+            if p.returncode:
+                print(f"  {name}: ohne Freisteller ({p.stderr.strip().splitlines()[0][:60]})")
+            lauf([sys.executable, HIER / "rasterbild.py", eingang, ziel,
+                  "--breite", str(spec.get("rasterbreite", 640))])
+        print(f"  {name} fertig")
+
+
+# ----------------------------------------------------------------- Szene ----
+def szene(projekt: Path, spec):
+    """Szene bauen und mit HyperFrames rendern."""
+    hf = hyperframes_finden()
+    if not hf:
+        sys.exit("HyperFrames nicht gefunden.\n"
+                 "  git clone https://github.com/heygen-com/hyperframes ~/projects/hyperframes\n"
+                 "  cd ~/projects/hyperframes && pnpm install && pnpm build\n"
+                 "Oder den Pfad zur hyperframes.mjs in HYPERFRAMES setzen.")
+    gsap = gsap_da()
+    if not gsap:
+        sys.exit("gsap.min.js nicht gefunden. Datei nach vorlage/gsap.min.js legen "
+                 "oder den Pfad in GSAP setzen.")
+
+    arbeit = projekt / "arbeit"; arbeit.mkdir(exist_ok=True)
+    # HyperFrames sucht index.html - und der Lint liest den Quelltext dieser
+    # einen Datei. Steht die Zeitleiste in einer externen .js, findet er sie
+    # nicht. Also wird alles hineingeschrieben.
+    huelle = (VORLAGE / "szene.html").read_text(encoding="utf-8")
+    motor = (VORLAGE / "szene.js").read_text(encoding="utf-8")
+    spec_js = "window.SPEC = " + json.dumps(spec, ensure_ascii=False, indent=1) + ";"
+    # data-duration und die Masse liest HyperFrames aus dem statischen HTML,
+    # bevor irgendein Skript laeuft. Sie zur Laufzeit zu setzen kommt zu spaet.
+    b, h = spec.get("masse", [1920, 1080])
+    huelle = (huelle
+              .replace('data-duration="10.000"', f'data-duration="{spec.get("dauer", 30):.3f}"')
+              .replace('data-width="1920"', f'data-width="{b}"')
+              .replace('data-height="1080"', f'data-height="{h}"'))
+    huelle = huelle.replace(
+        '<script src="spec.js"></script>\n<script src="szene.js"></script>',
+        f"<script>\n{spec_js}\n</script>\n<script>\n{motor}\n</script>")
+    (arbeit / "index.html").write_text(huelle, encoding="utf-8")
+    shutil.copy(gsap, arbeit / "gsap.min.js")
+    (arbeit / "hyperframes.json").write_text('{"paths":{"assets":"."}}', encoding="utf-8")
+
+    aus = projekt / "aus"; aus.mkdir(exist_ok=True)
+    ziel = aus / "szene.mp4"
+    lauf(["node", hf, "lint", arbeit])
+    lauf(["node", hf, "render", arbeit, "-o", ziel, "--format", "mp4", "--quality", "high"])
+    print(f"  {ziel}")
+    return ziel
+
+
+def gsap_da():
+    for p in (os.environ.get("GSAP"), VORLAGE / "gsap.min.js",
+              Path.home() / "projects/schnittraum/workflows/gsap.min.js"):
+        if p and Path(p).exists():
+            return Path(p)
+    return None
+
+
+# ------------------------------------------------------------------- Ton ----
+STIMMUNGEN = {   # Akkord in Hertz, tief genug, dass Sprache darueber frei bleibt
+    "ruhig":    [110.00, 164.81, 220.00, 329.63],
+    "warm":     [98.00, 146.83, 196.00, 293.66],
+    "spannung": [87.31, 116.54, 174.61, 233.08],
+    "hell":     [130.81, 196.00, 261.63, 392.00],
+}
+
+
+def bett_bauen(stimmung, dauer, ziel: Path):
+    """Flaches Bett aus gestimmten Sinustoenen - kein Sample, keine fremden Rechte."""
+    toene = STIMMUNGEN.get(stimmung, STIMMUNGEN["ruhig"])
+    ein, teile = [], []
+    for i, hz in enumerate(toene):
+        ein += ["-f", "lavfi", "-t", f"{dauer:.2f}", "-i", f"sine=frequency={hz}:sample_rate=48000"]
+        teile.append(f"[{i}:a]volume={0.5/len(toene):.3f},tremolo=f=0.13:d=0.25[t{i}]")
+    n = len(toene)
+    ein += ["-f", "lavfi", "-t", f"{dauer:.2f}", "-i", "anoisesrc=color=brown:sample_rate=48000"]
+    teile.append(f"[{n}:a]lowpass=f=900,volume=0.05[rausch]")
+    misch = "".join(f"[t{i}]" for i in range(n)) + "[rausch]" + \
+            f"amix=inputs={n+1}:normalize=0,alimiter=limit=0.7[aus]"
+    lauf(["ffmpeg", "-v", "error", "-y", *ein, "-filter_complex", ";".join(teile + [misch]),
+          "-map", "[aus]", "-c:a", "libmp3lame", "-b:a", "192k", ziel])
+
+
+def lautheit(datei) -> float:
+    p = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(datei),
+                        "-af", "ebur128=peak=true", "-f", "null", "-"],
+                       capture_output=True, text=True)
+    for zeile in reversed(p.stderr.splitlines()):
+        if zeile.strip().startswith("I:") and "LUFS" in zeile:
+            return float(zeile.split()[1])
+    return float("nan")
+
+
+def ton(projekt: Path, spec, video: Path):
+    t = spec.get("ton") or {}
+    stimme = t.get("stimme")
+    aus = projekt / "aus"
+    ziel = aus / (spec.get("name", "film") + ".mp4")
+    if not stimme:
+        shutil.copy(video, ziel); print(f"  ohne Ton\n\n  {ziel}"); return ziel
+    stimm_weg = projekt / stimme
+    if not stimm_weg.exists():
+        sys.exit(f"Stimme fehlt: {stimm_weg}")
+
+    poliert = projekt / "arbeit" / "stimme.wav"
+    lauf(["ffmpeg", "-v", "error", "-y", "-i", stimm_weg,
+          "-af", "highpass=f=85,acompressor=threshold=-20dB:ratio=3:attack=8:release=180,"
+                 "alimiter=limit=0.94",
+          "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", poliert])
+
+    dauer = spec.get("dauer", 30)
+    roh = projekt / "arbeit" / "roh.mp4"
+    if t.get("bett"):
+        bett = projekt / "arbeit" / "bett.mp3"
+        bett_bauen(t["bett"], dauer + 2, bett)
+        # Das Bett gehoert rund 20 LU unter die Stimme. Fest eingestellte
+        # Dezibel treffen das nicht - also messen und daraus rechnen.
+        lu_stimme, lu_bett = lautheit(poliert), lautheit(bett)
+        gain = (lu_stimme - t.get("abstand", 20)) - lu_bett
+        print(f"  Stimme {lu_stimme:.1f} LUFS, Bett {lu_bett:.1f} LUFS -> {gain:+.1f} dB")
+        fc = (f"[2:a]atrim=0:{dauer:.2f},volume={gain:.1f}dB,asetpts=PTS-STARTPTS[bett];"
+              f"[bett][1:a]sidechaincompress=threshold=0.015:ratio=12:attack=5:release=300[duck];"
+              f"[1:a][duck]amix=inputs=2:duration=first:normalize=0[mix]")
+        lauf(["ffmpeg", "-v", "error", "-y", "-i", video, "-i", poliert, "-i", bett,
+              "-filter_complex", fc, "-map", "0:v", "-map", "[mix]",
+              "-c:v", "copy", "-c:a", "pcm_s16le", "-shortest", roh])
+    else:
+        lauf(["ffmpeg", "-v", "error", "-y", "-i", video, "-i", poliert,
+              "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "pcm_s16le",
+              "-shortest", roh])
+
+    # Zweistufige Lautheit: einstufiges loudnorm schaetzt nur und liegt daneben.
+    ziel_lufs = t.get("ziel_lufs", -14)
+    mess = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(roh), "-af",
+                           f"loudnorm=I={ziel_lufs}:TP=-1.5:LRA=11:print_format=json",
+                           "-f", "null", "-"], capture_output=True, text=True).stderr
+    af = f"loudnorm=I={ziel_lufs}:TP=-1.5:LRA=11"
+    try:
+        m = json.loads(mess[mess.rindex("{"):mess.rindex("}") + 1])
+        af += (f":measured_I={m['input_i']}:measured_TP={m['input_tp']}"
+               f":measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}"
+               f":offset={m['target_offset']}:linear=true")
+    except (ValueError, KeyError):
+        print("  Messlauf unbrauchbar, einstufig normalisiert")
+    # loudnorm rechnet intern mit 192 kHz und zieht die Ausgabe mit hoch.
+    af += ",aresample=48000"
+    lauf(["ffmpeg", "-v", "error", "-y", "-i", roh, "-af", af, "-c:v", "copy",
+          "-c:a", "aac", "-b:a", "256k", "-ar", "48000", "-movflags", "+faststart", ziel])
+    print(f"  Lautheit {lautheit(ziel):.1f} LUFS\n\n  {ziel}")
+    return ziel
+
+
+# ------------------------------------------------------------------ neu -----
+def neu(projekt: Path):
+    if projekt.exists() and any(projekt.iterdir()):
+        sys.exit(f"{projekt} ist nicht leer")
+    (projekt / "bilder").mkdir(parents=True, exist_ok=True)
+    shutil.copy(BEISPIEL / "spec.json", projekt / "spec.json")
+    print(f"Angelegt: {projekt}\n"
+          f"  spec.json anpassen, Fotos nach bilder/ legen, dann:\n"
+          f"    vox.py bauen {projekt}")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("befehl", choices=["neu", "bilder", "szene", "ton", "bauen"])
+    ap.add_argument("projekt")
+    a = ap.parse_args()
+    projekt = Path(a.projekt).resolve()
+
+    if a.befehl == "neu":
+        return neu(projekt)
+    spec = spec_lesen(projekt)
+    if a.befehl in ("bilder", "bauen"):
+        print("Bilder aufbereiten ..."); bilder(projekt, spec)
+    if a.befehl in ("szene", "bauen"):
+        print("Szene rendern ..."); v = szene(projekt, spec)
+    if a.befehl in ("ton", "bauen"):
+        v = projekt / "aus" / "szene.mp4"
+        if not v.exists():
+            sys.exit("aus/szene.mp4 fehlt - erst `szene` laufen lassen")
+        print("Ton mischen ..."); ton(projekt, spec, v)
+
+
+if __name__ == "__main__":
+    main()
