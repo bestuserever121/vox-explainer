@@ -22,7 +22,7 @@ Requires `ffmpeg`, `node`, `python3` (with Pillow + numpy), and
 [HyperFrames](https://github.com/heygen-com/hyperframes) for rendering.
 
 ```bash
-git clone https://github.com/<you>/vox-explainer
+git clone https://github.com/bestuserever121/vox-explainer
 cd vox-explainer
 ./voraussetzungen.sh          # checks what is present and what is missing
 ```
