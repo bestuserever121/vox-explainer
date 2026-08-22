@@ -75,9 +75,13 @@ Optional but recommended:
 **Build a scene from a spec** — the collage explainer above.
 
 ```bash
-bin/vox.py neu    my-video/     # create a project from the example
-bin/vox.py bauen  my-video/     # images, scene, audio, export
+bin/vox.py neu   my-video/            # spec + a szene.js skeleton to write
+bin/vox.py neu   my-video/ --raster   # or start from the built-in grid
+bin/vox.py bauen my-video/            # images, scene, audio, export
 ```
+
+`neu` gives you a scene to write, not a form to fill in — the arrangement
+should come from what the video says.
 
 **Cut existing footage** — a talking head, a podcast, raw camera material.
 Point the spec at a file and it transcribes, removes filler words and dead air,

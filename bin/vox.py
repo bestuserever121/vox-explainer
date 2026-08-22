@@ -342,13 +342,27 @@ def ton(projekt: Path, spec, video: Path):
 
 
 # ------------------------------------------------------------------ neu -----
-def neu(projekt: Path):
+def neu(projekt: Path, raster=False):
     if projekt.exists() and any(projekt.iterdir()):
         sys.exit(f"{projekt} ist nicht leer")
     (projekt / "bilder").mkdir(parents=True, exist_ok=True)
-    shutil.copy(BEISPIEL / "spec.json", projekt / "spec.json")
+    if raster:
+        shutil.copy(BEISPIEL / "spec.json", projekt / "spec.json")
+        print(f"Angelegt: {projekt} (Rasteranordnung)\n"
+              f"  spec.json anpassen, Fotos nach bilder/ legen, dann:\n"
+              f"    vox.py bauen {projekt}")
+        return
+    # Standard ist die eigene Szene. Das Raster ist die Ausnahme, nicht die
+    # Regel - sonst sieht jedes Video gleich aus.
+    (projekt / "spec.json").write_text(json.dumps({
+        "name": projekt.name, "masse": [1920, 1080], "fps": 30, "dauer": 20.0,
+        "stil": "papier", "ton": {"bett": "ruhig", "ziel_lufs": -14},
+    }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    shutil.copy(VORLAGE / "szene-geruest.js", projekt / "szene.js")
     print(f"Angelegt: {projekt}\n"
-          f"  spec.json anpassen, Fotos nach bilder/ legen, dann:\n"
+          f"  szene.js ist ein Geruest - die Anordnung baut man am Inhalt entlang.\n"
+          f"  API: docs/laufzeit.md\n"
+          f"  Fertiges Raster stattdessen:  vox.py neu {projekt} --raster\n\n"
           f"    vox.py bauen {projekt}")
 
 
@@ -358,11 +372,13 @@ def main():
     ap.add_argument("befehl", choices=["neu", "bilder", "szene", "schnitt",
                                        "untertitel", "ton", "bauen"])
     ap.add_argument("projekt")
+    ap.add_argument("--raster", action="store_true",
+                    help="mitgelieferte Rasteranordnung statt einer eigenen Szene")
     a = ap.parse_args()
     projekt = Path(a.projekt).resolve()
 
     if a.befehl == "neu":
-        return neu(projekt)
+        return neu(projekt, a.raster)
     spec = spec_lesen(projekt)
     material = bool((spec.get("video") or {}).get("quelle"))
 

@@ -8,7 +8,8 @@ description: Make videos two ways - build collage explainer scenes from a JSON s
 Four looks, one spec: `papier` · `dunkel` · `blaupause` · `riso`.
 
 ```
-bin/vox.py neu    projekt/       # scaffold from the example
+bin/vox.py neu    projekt/          # scaffold: spec + a szene.js to write
+bin/vox.py neu    projekt/ --raster # scaffold with the built-in grid instead
 
 # build a scene from a spec
 bin/vox.py bilder projekt/       # cut out and halftone the photos
@@ -44,10 +45,14 @@ to do nothing, that is why.
 `vorlage/raster.js` is **one** arrangement: panels on a grid, a snake path, a
 pull-out. It is convenient, and it makes every video look structurally the same.
 
-**Design the composition for what this particular video says.** Drop a
-`szene.js` into the project and it replaces the grid; the runtime (`vox.*`)
-still supplies the paper, the palette, the camera and the timeline. See
-[docs/laufzeit.md](docs/laufzeit.md).
+**Write a new composition for every video.** `vox.py neu` scaffolds exactly
+that — a `szene.js` skeleton you throw away and replace with an arrangement
+built around what this video actually says. The runtime (`vox.*`) supplies the
+paper, the palette, the camera and the timeline; the shapes and their placement
+are yours. See [docs/laufzeit.md](docs/laufzeit.md).
+
+Reach for `--raster` only when the content really is a chain of separate,
+equal-weight claims. Everything else deserves its own arrangement.
 
 Arrangements worth reaching for instead of the grid:
 
@@ -58,8 +63,9 @@ Arrangements worth reaching for instead of the grid:
 - a **single object** that grows, splits or fills as the argument builds
 - a **stack** that piles up until it collapses
 
-Reach for the grid when the content really is a chain of separate claims.
-Otherwise write the scene.
+The prompt decides the arrangement. A cycle wants a loop, a chain of
+consequences wants a descent, a comparison wants two columns that finally
+collide, a single overwhelming thing wants one object that keeps growing.
 
 ## How to approach a video
 
