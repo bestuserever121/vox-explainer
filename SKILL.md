@@ -1,9 +1,11 @@
 ---
 name: vox-explainer
-description: Build paper-collage explainer videos in the style of explainer journalism - a paper sheet, halftone black-and-white photo cutouts, flat bold colour shapes, black arrows, and a camera travelling a grid of panels that pulls out at the end to reveal the whole argument. Use for "explainer video", "vox style", "erklaervideo", "video from a voiceover", "turn this argument into a video", "collage animation".
+description: Build collage explainer videos from a JSON spec - halftone photo cutouts, flat bold colour shapes, arrows, and a camera travelling a grid of panels that pulls out at the end to reveal the whole argument. Four switchable looks: paper, dark, blueprint, riso. Use for "explainer video", "vox style", "erklaervideo", "video from a voiceover", "turn this argument into a video", "collage animation", "motion graphics from a script".
 ---
 
 # vox — explainer videos from a spec
+
+Four looks, one spec: `papier` · `dunkel` · `blaupause` · `riso`.
 
 ```
 bin/vox.py neu    projekt/     # scaffold from the example
