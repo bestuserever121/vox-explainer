@@ -19,6 +19,9 @@
 <!-- Reihenfolge zaehlt: erst GSAP, dann SPEC, dann der Aufbau. -->
 <script src="gsap.min.js"></script>
 <script src="spec.js"></script>
+<script src="vox.js"></script>
 <script src="szene.js"></script>
-<script>window.__voxAufbau(window.SPEC);</script>
+<!-- Eine Rasterszene meldet __voxAufbau an; eine frei geschriebene
+     Szene baut sich beim Laden selbst und braucht das nicht. -->
+<script>if (window.__voxAufbau) window.__voxAufbau(window.SPEC);</script>
 </body></html>

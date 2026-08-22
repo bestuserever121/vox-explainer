@@ -63,6 +63,11 @@ def bilder(projekt: Path, spec):
     arbeit = projekt / "arbeit"; arbeit.mkdir(exist_ok=True)
     gewuenscht = {b["datei"] for f in spec.get("felder", [])
                   for b in (f.get("bilder") or []) if b.get("datei")}
+    if not gewuenscht:
+        # Eine frei geschriebene Szene sagt nicht in der Spec, welche Bilder sie
+        # braucht - dann wird alles aufbereitet, was in bilder/ liegt.
+        gewuenscht = {q.stem + ".png" for q in sorted(roh.iterdir())
+                      if q.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")}
     python = os.environ.get("VOX_PYTHON", sys.executable)
     for name in sorted(gewuenscht):
         ziel = arbeit / name
@@ -103,8 +108,7 @@ def szene(projekt: Path, spec):
     # einen Datei. Steht die Zeitleiste in einer externen .js, findet er sie
     # nicht. Also wird alles hineingeschrieben.
     huelle = (VORLAGE / "szene.html").read_text(encoding="utf-8")
-    motor = (VORLAGE / "szene.js").read_text(encoding="utf-8")
-    spec_js = "window.SPEC = " + json.dumps(spec, ensure_ascii=False, indent=1) + ";"
+    laufzeit = (VORLAGE / "vox.js").read_text(encoding="utf-8")
     # data-duration und die Masse liest HyperFrames aus dem statischen HTML,
     # bevor irgendein Skript laeuft. Sie zur Laufzeit zu setzen kommt zu spaet.
     b, h = spec.get("masse", [1920, 1080])
@@ -112,9 +116,22 @@ def szene(projekt: Path, spec):
               .replace('data-duration="10.000"', f'data-duration="{spec.get("dauer", 30):.3f}"')
               .replace('data-width="1920"', f'data-width="{b}"')
               .replace('data-height="1080"', f'data-height="{h}"'))
+    # Eine eigene Szene im Projekt schlaegt die mitgelieferte Rasteranordnung.
+    # Genau dafuer ist die Trennung da: raster.js ist EIN Weg, nicht DER Weg.
+    eigen = projekt / "szene.js"
+    if eigen.exists():
+        anordnung = eigen.read_text(encoding="utf-8")
+        print("  Anordnung: szene.js aus dem Projekt")
+    else:
+        anordnung = (VORLAGE / "raster.js").read_text(encoding="utf-8")
+        print("  Anordnung: Raster (vorlage/raster.js)")
+    spec_js = "window.SPEC = " + json.dumps(spec, ensure_ascii=False, indent=1) + ";"
     huelle = huelle.replace(
-        '<script src="spec.js"></script>\n<script src="szene.js"></script>',
-        f"<script>\n{spec_js}\n</script>\n<script>\n{motor}\n</script>")
+        '<script src="spec.js"></script>\n<script src="vox.js"></script>\n'
+        '<script src="szene.js"></script>',
+        f"<script>\n{spec_js}\n</script>\n<script>\n{laufzeit}\n</script>\n"
+        f"<script>\n{anordnung}\n</script>")
+    shutil.copy(gsap, arbeit / "gsap.min.js")
     (arbeit / "index.html").write_text(huelle, encoding="utf-8")
     shutil.copy(gsap, arbeit / "gsap.min.js")
     (arbeit / "hyperframes.json").write_text('{"paths":{"assets":"."}}', encoding="utf-8")

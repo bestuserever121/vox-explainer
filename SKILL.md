@@ -23,6 +23,7 @@ bin/vox.py bauen  projekt/       # whichever path the spec implies
 ```
 
 `"video": {"quelle": "raw.mp4"}` in the spec switches to footage mode.
+A `szene.js` in the project replaces the built-in grid arrangement.
 
 Everything lives in one `spec.json`. Panels are laid out on a grid in a snake
 path; arrows between them are drawn automatically; `schluss` pulls the camera
@@ -37,6 +38,28 @@ identical across styles, so switching never means touching the panels.
 
 **A `palette` block in the spec overrides the style.** If a style switch appears
 to do nothing, that is why.
+
+## Compose for the content — do not fill in the grid
+
+`vorlage/raster.js` is **one** arrangement: panels on a grid, a snake path, a
+pull-out. It is convenient, and it makes every video look structurally the same.
+
+**Design the composition for what this particular video says.** Drop a
+`szene.js` into the project and it replaces the grid; the runtime (`vox.*`)
+still supplies the paper, the palette, the camera and the timeline. See
+[docs/laufzeit.md](docs/laufzeit.md).
+
+Arrangements worth reaching for instead of the grid:
+
+- a **tall sheet** the camera descends, with one element — a figure, a machine,
+  a map — running continuously through several sections
+- an **anatomical plate**: one subject, labels with arrows pointing into it
+- a **timeline** the camera tracks along
+- a **single object** that grows, splits or fills as the argument builds
+- a **stack** that piles up until it collapses
+
+Reach for the grid when the content really is a chain of separate claims.
+Otherwise write the scene.
 
 ## How to approach a video
 
@@ -95,6 +118,11 @@ the removed duration.
   zooms out.
 - **A camera move needs a start *and* an end.** Giving only the target makes
   every move jump.
+- **Compute camera targets:** `x = B/2 - s*cx`, `y = H/2 - s*cy`. Eyeballed
+  values put labelling arrows on the wrong body part.
+- **Measure an element before placing something beside it** (`offsetWidth`).
+  A guessed offset lands the arrow inside the text box, where it reads as a
+  strikethrough.
 - **An ASS `Format:` line must list `SecondaryColour`.** Leave it out and
   libass misassigns every following field — the text simply never appears, with
   no error anywhere.

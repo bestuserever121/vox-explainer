@@ -10,6 +10,13 @@ You describe the video in one `spec.json`. Everything else is generated.
 
 ![the full sheet](docs/beispiel-blatt.png)
 
+## The grid is optional
+
+The built-in arrangement — panels on a grid, snake path, pull-out — is one
+option. Drop a `szene.js` into the project and it replaces the grid entirely;
+the runtime still gives you the paper, the palette, the camera and the
+timeline. See [docs/laufzeit.md](docs/laufzeit.md) for the API.
+
 ## Styles
 
 `"stil"` switches the whole look. The palette names stay the same across
