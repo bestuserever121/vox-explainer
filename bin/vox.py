@@ -137,10 +137,22 @@ def szene(projekt: Path, spec):
     (arbeit / "hyperframes.json").write_text('{"paths":{"assets":"."}}', encoding="utf-8")
 
     aus = projekt / "aus"; aus.mkdir(exist_ok=True)
-    ziel = aus / "szene.mp4"
     lauf(["node", hf, "lint", arbeit])
-    lauf(["node", hf, "render", arbeit, "-o", ziel, "--format", "mp4", "--quality", "high"])
-    print(f"  {ziel}")
+    if spec.get("ueberlagerung"):
+        # ProRes 4444: WebM verliert den Alphakanal stillschweigend, und ohne
+        # Alpha deckt die Ebene das Material vollstaendig zu.
+        ziel = aus / "ebene.mov"
+        lauf(["node", hf, "render", arbeit, "-o", ziel, "--format", "mov"])
+        pf = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                             "-show_entries", "stream=pix_fmt", "-of", "csv=p=0", str(ziel)],
+                            capture_output=True, text=True).stdout.strip()
+        if not pf.startswith(("yuva", "rgba", "bgra", "argb", "gbrap")):
+            sys.exit(f"FEHLER: Ebene ohne Alpha (pix_fmt={pf}) - sie wuerde alles zudecken.")
+        print(f"  {ziel}  (Alpha: {pf})")
+    else:
+        ziel = aus / "szene.mp4"
+        lauf(["node", hf, "render", arbeit, "-o", ziel, "--format", "mp4", "--quality", "high"])
+        print(f"  {ziel}")
     return ziel
 
 
@@ -196,6 +208,8 @@ def schnitt(projekt: Path, spec):
         befehl.append("--behalte-fueller")
     if v.get("pause_max"):
         befehl += ["--pause-max", str(v["pause_max"])]
+    if v.get("bild"):
+        befehl += ["--bild", v["bild"]]
     p = subprocess.run([str(c) for c in befehl])
     if p.returncode:
         sys.exit("Schnitt fehlgeschlagen")
@@ -220,6 +234,48 @@ def untertitel(projekt: Path, spec):
                          "--gruppe", str(v.get("gruppe", 3))]])
     if p.returncode:
         sys.exit("Untertitel fehlgeschlagen")
+    return ziel
+
+
+def auflegen(projekt: Path, spec):
+    """Die gerenderte Ebene auf das Material legen."""
+    aus = projekt / "aus"
+    ebene = aus / "ebene.mov"
+    if not ebene.exists():
+        sys.exit("aus/ebene.mov fehlt - erst `szene` mit \"ueberlagerung\": true laufen lassen")
+    stufen = ["untertitelt.mp4", "schnitt.mp4"]
+    unten = next((aus / s for s in stufen if (aus / s).exists()), None)
+    if unten is None:
+        v = (spec.get("video") or {}).get("quelle")
+        unten = projekt / v if v else None
+    if not unten or not unten.exists():
+        sys.exit("kein Material gefunden - video.quelle setzen oder erst schneiden")
+    ziel = aus / "belegt.mp4"
+    masse = lauf(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                  "stream=width,height", "-of", "csv=p=0", unten]).stdout.strip().split(",")
+    vb, vh = int(masse[0]), int(masse[1])
+    # Die Ebene entsteht in der Groesse aus der Spec. Weicht das Material ab,
+    # wuerde overlay nur die linke obere Ecke zeigen.
+    print(f"  {unten.name} + {ebene.name} -> {vb}x{vh}")
+    lauf(["ffmpeg", "-v", "error", "-y", "-i", unten, "-i", ebene,
+          "-filter_complex", f"[1:v]scale={vb}:{vh}[e];[0:v][e]overlay=0:0:format=auto[v]",
+          "-map", "[v]", "-map", "0:a?", "-c:v", "libx264", "-crf", "18",
+          "-preset", "medium", "-pix_fmt", "yuv420p", "-c:a", "copy", ziel])
+    # Stoesse aufs Bild: wenn im Ton "dynamic" faellt, soll auch am Bild
+    # etwas passieren - nicht nur eine Grafik daneben.
+    for i, st in enumerate(spec.get("stoesse") or []):
+        zwischen = aus / f"stoss-{i}.mp4"
+        befehl = [sys.executable, HIER / "dynamik.py", ziel, zwischen,
+                  "--von", str(st["von"]), "--bis", str(st["bis"])]
+        if st.get("punch"):
+            befehl += ["--punch"] + [str(x) for x in st["punch"]]
+        if st.get("staerke"):
+            befehl += ["--staerke", str(st["staerke"])]
+        p = subprocess.run([str(c) for c in befehl])
+        if p.returncode:
+            sys.exit("Stoss fehlgeschlagen")
+        zwischen.replace(ziel)
+    print(f"  {ziel}")
     return ziel
 
 
@@ -370,7 +426,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("befehl", choices=["neu", "bilder", "szene", "schnitt",
-                                       "untertitel", "ton", "bauen"])
+                                       "untertitel", "auflegen", "ton", "bauen"])
     ap.add_argument("projekt")
     ap.add_argument("--raster", action="store_true",
                     help="mitgelieferte Rasteranordnung statt einer eigenen Szene")
@@ -384,7 +440,8 @@ def main():
 
     if a.befehl == "bilder" or (a.befehl == "bauen" and not material):
         print("Bilder aufbereiten ..."); bilder(projekt, spec)
-    if a.befehl == "szene" or (a.befehl == "bauen" and not material):
+    if a.befehl == "szene" or (a.befehl == "bauen"
+                               and (not material or spec.get("ueberlagerung"))):
         print("Szene rendern ..."); szene(projekt, spec)
     if a.befehl == "schnitt" or (a.befehl == "bauen" and material):
         print("Rohschnitt ..."); schnitt(projekt, spec)
@@ -392,9 +449,12 @@ def main():
                                     and (spec.get("video") or {}).get("untertitel")):
         print("Untertitel ..."); untertitel(projekt, spec)
 
+    if a.befehl == "auflegen" or (a.befehl == "bauen" and spec.get("ueberlagerung") and material):
+        print("Ebene auflegen ..."); auflegen(projekt, spec)
+
     if a.befehl in ("ton", "bauen"):
         # Die zuletzt entstandene Stufe ist die Grundlage.
-        stufen = ["untertitelt.mp4", "schnitt.mp4", "szene.mp4"]
+        stufen = ["belegt.mp4", "untertitelt.mp4", "schnitt.mp4", "szene.mp4"]
         v = next((projekt / "aus" / s for s in stufen if (projekt / "aus" / s).exists()), None)
         if not v:
             sys.exit("Nichts zu vertonen - erst `szene` oder `schnitt` laufen lassen")

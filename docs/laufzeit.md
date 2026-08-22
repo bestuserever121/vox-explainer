@@ -63,3 +63,49 @@ append — the runtime only owns the ground, the palette and the clock.
 `strahl` `balken` `kugel` `bahn` `pokal` `gegner` `ball` `plan` `punkt`.
 
 Use them where they fit and ignore them where they do not.
+
+## Overlaying graphics on footage
+
+Set `"ueberlagerung": true` in the spec and the scene renders with an alpha
+channel instead of a ground — no paper, no grain, no vignette, just the
+elements. `vox.py auflegen` composites it over the cut footage.
+
+```jsonc
+{
+  "masse": [1280, 720], "fps": 25, "dauer": 30.7,
+  "stil": "dunkel",
+  "ueberlagerung": true,
+  "video": { "quelle": "roh.mp4", "bild": "eq=brightness=0.06:contrast=1.22" },
+  "stoesse": [ { "von": 11.1, "bis": 13.6, "punch": [0.0, 1.1], "staerke": 1.15 } ]
+}
+```
+
+`video.bild` is an ffmpeg filter applied during the cut — the place where the
+material is re-encoded anyway. `stoesse` are zoom punches on the picture after
+compositing: when the voiceover says something happens, something happens.
+
+## Tracking
+
+`bin/verfolgen.py` follows a patch through the footage by normalised
+cross-correlation (numpy only, no OpenCV) and writes a track:
+
+```bash
+bin/verfolgen.py roh.mp4 --von 15.4 --bis 21.2 --start 675,400 \
+                 --muster 190 --aus spur.json
+```
+
+Put the track into the spec and drive an element from it — one short linear
+tween per sample:
+
+```js
+for (let i = 1; i < spur.length; i++) {
+  const a = spur[i - 1], b = spur[i];
+  vox.tween(el, { x: [a.x - spur[0].x, b.x - spur[0].x],
+                  y: [a.y - spur[0].y, b.y - spur[0].y] },
+            a.t, b.t - a.t, "linear");
+}
+```
+
+The track reports a `guete` (match confidence) per sample. Look at it: below
+about 0.6 the tracker is guessing, and an element that jumps is worse than one
+that sits still.

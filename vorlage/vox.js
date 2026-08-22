@@ -122,6 +122,10 @@
 
   function stilSchreiben(spec) {
     const stil = STILE[spec.stil] || STILE.papier;
+    // Ueberlagerung: die Szene liegt spaeter auf einem Video. Dann darf kein
+    // Grund gemalt werden - Papier, Knicke, Korn und Vignette wuerden das
+    // Material zudecken. Palette, Schrift und Bewegung bleiben.
+    const drueber = !!spec.ueberlagerung;
     const p = Object.assign({}, stil.palette, stil.schrift, spec.palette || {});
     const [B, H] = spec.masse || [1920, 1080];
     // Aus der Tinte abgeleitete Fuellungen - fest verdrahtete Grauwerte
@@ -132,15 +136,20 @@
 @font-face { font-family:'${p.anzeige}'; src: local('${p.anzeige}'); font-display: block; }
 @font-face { font-family:'${p.text}'; src: local('${p.text}'); font-display: block; }
 * { margin:0; padding:0; box-sizing:border-box; }
-html, body { width:${B}px; height:${H}px; overflow:hidden; background:${p.papier}; }
+html, body { width:${B}px; height:${H}px; overflow:hidden;
+  background:${drueber ? "transparent" : p.papier}; }
 body { font-family:"${p.text}", system-ui, sans-serif; color:${p.tinte}; }
-#papier { position:absolute; inset:0; background:${p.papier}; }
-#falten { position:absolute; inset:0; pointer-events:none; ${stil.struktur(B, H)} }
+#papier { position:absolute; inset:0;
+  background:${drueber ? "transparent" : p.papier}; }
+#falten { position:absolute; inset:0; pointer-events:none;
+  ${drueber ? "display:none" : stil.struktur(B, H)} }
 /* Ein <svg> ohne width/height ist 300x150 gross - dann liegt das Korn als
    Kaestchen in der Ecke statt ueber dem Blatt. */
 #korn { position:absolute; left:0; top:0; width:${B}px; height:${H}px;
-        opacity:${stil.korn.deckung}; mix-blend-mode:${stil.korn.mischen}; pointer-events:none; }
-#vignette { position:absolute; inset:0; pointer-events:none; background:${stil.vignette}; }
+        opacity:${drueber ? 0 : stil.korn.deckung};
+        mix-blend-mode:${stil.korn.mischen}; pointer-events:none; }
+#vignette { position:absolute; inset:0; pointer-events:none;
+  background:${drueber ? "none" : stil.vignette}; }
 #buehne { position:absolute; inset:0; overflow:hidden; }
 #welt { position:absolute; left:0; top:0; transform-origin:0 0; }
 .feld { position:absolute; overflow:hidden; }

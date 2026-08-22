@@ -93,6 +93,8 @@ def main():
     ap.add_argument("--aus", required=True)
     ap.add_argument("--behalte-fueller", action="store_true")
     ap.add_argument("--pause-max", type=float, default=STILLE_MAX)
+    ap.add_argument("--bild", default=None,
+                    help="ffmpeg-Filter fuers Bild, z.B. eq=brightness=0.08:contrast=1.2")
     a = ap.parse_args()
 
     quelle = Path(a.quelle)
@@ -150,7 +152,8 @@ def main():
     ein, vteile, ateile = [], [], []
     for i, (v, b) in enumerate(absch):
         ein += ["-ss", f"{v:.4f}", "-to", f"{b:.4f}", "-i", str(quelle)]
-        vteile.append(f"[{i}:v]setpts=PTS-STARTPTS,fps={fps}[v{i}]")
+        bild = f",{a.bild}" if a.bild else ""
+        vteile.append(f"[{i}:v]setpts=PTS-STARTPTS,fps={fps}{bild}[v{i}]")
         ateile.append(f"[{i}:a]asetpts=PTS-STARTPTS[a{i}]")
     n = len(absch)
     fc = vteile + ateile
