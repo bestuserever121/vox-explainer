@@ -261,18 +261,30 @@ def ton(projekt: Path, spec, video: Path):
     elif hat_ton(video):
         stimm_weg = video
         print("  Stimme kommt aus der Tonspur des Videos")
+    elif t.get("bett"):
+        # Ohne Sprecher, aber mit Bett: dann traegt das Bett allein. Frueher
+        # fiel dieser Fall durch und das Video blieb stumm.
+        stimm_weg = None
+        print("  ohne Sprecher - nur Musikbett")
     else:
         shutil.copy(video, ziel); print(f"  ohne Ton\n\n  {ziel}"); return ziel
 
-    poliert = projekt / "arbeit" / "stimme.wav"
-    lauf(["ffmpeg", "-v", "error", "-y", "-i", stimm_weg,
-          "-af", "highpass=f=85,acompressor=threshold=-20dB:ratio=3:attack=8:release=180,"
-                 "alimiter=limit=0.94",
-          "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", poliert])
-
     dauer = spec.get("dauer", 30)
     roh = projekt / "arbeit" / "roh.mp4"
-    if t.get("bett"):
+    poliert = projekt / "arbeit" / "stimme.wav"
+    if stimm_weg:
+        lauf(["ffmpeg", "-v", "error", "-y", "-i", stimm_weg,
+              "-af", "highpass=f=85,acompressor=threshold=-20dB:ratio=3:attack=8:release=180,"
+                     "alimiter=limit=0.94",
+              "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", poliert])
+
+    if t.get("bett") and not stimm_weg:
+        bett = projekt / "arbeit" / "bett.mp3"
+        bett_bauen(t["bett"], dauer + 2, bett)
+        lauf(["ffmpeg", "-v", "error", "-y", "-i", video, "-i", bett,
+              "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "pcm_s16le",
+              "-shortest", roh])
+    elif t.get("bett"):
         bett = projekt / "arbeit" / "bett.mp3"
         bett_bauen(t["bett"], dauer + 2, bett)
         # Das Bett gehoert rund 20 LU unter die Stimme. Fest eingestellte
