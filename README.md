@@ -13,9 +13,21 @@ You describe the video in one `spec.json`. Everything else is generated.
 ## The grid is optional
 
 The built-in arrangement — panels on a grid, snake path, pull-out — is one
-option. Drop a `szene.js` into the project and it replaces the grid entirely;
-the runtime still gives you the paper, the palette, the camera and the
-timeline. See [docs/laufzeit.md](docs/laufzeit.md) for the API.
+option, and it makes every video look structurally the same. Drop a `szene.js`
+into the project and it replaces the grid entirely; the runtime still gives you
+the paper, the palette, the camera and the timeline.
+
+![a hand-written composition](docs/frei.gif)
+
+Above: a tall sheet the camera descends, one subject running continuously
+through several sections, labels pointing into it with arrows, a zoom, a stamp.
+No grid involved.
+
+![the whole sheet](docs/frei-blatt.png)
+
+See [docs/laufzeit.md](docs/laufzeit.md) for the runtime API — camera, tweens,
+typewriter, counters, arrows — and the rules that bite (compute camera targets,
+measure elements before placing things beside them).
 
 ## Styles
 
@@ -88,6 +100,8 @@ burns captions, and masters the audio.
 ```bash
 bin/vox.py bauen my-video/      # cut, caption, mix, normalise
 ```
+
+![captions burned in](docs/schnitt.png)
 
 The cut uses **two sources, not one**: the transcript says where speech *is*,
 the level measurement says where silence is. Neither is trustworthy alone —
