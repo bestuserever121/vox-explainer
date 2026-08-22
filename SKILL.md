@@ -1,6 +1,6 @@
 ---
 name: vox-explainer
-description: Build collage explainer videos from a JSON spec - halftone photo cutouts, flat bold colour shapes, arrows, and a camera travelling a grid of panels that pulls out at the end to reveal the whole argument. Four switchable looks: paper, dark, blueprint, riso. Use for "explainer video", "vox style", "erklaervideo", "video from a voiceover", "turn this argument into a video", "collage animation", "motion graphics from a script".
+description: Make videos two ways - build collage explainer scenes from a JSON spec (halftone cutouts, flat colour, arrows, a camera travelling a grid), or cut existing footage for YouTube (transcribe, strip filler words and dead air, burn captions, master the audio). Four looks: paper, dark, blueprint, riso. Use for "explainer video", "vox style", "erklaervideo", "rough cut", "cut this footage", "remove filler words", "add subtitles", "edit my video", "motion graphics from a script".
 ---
 
 # vox — explainer videos from a spec
@@ -8,12 +8,21 @@ description: Build collage explainer videos from a JSON spec - halftone photo cu
 Four looks, one spec: `papier` · `dunkel` · `blaupause` · `riso`.
 
 ```
-bin/vox.py neu    projekt/     # scaffold from the example
-bin/vox.py bilder projekt/     # cut out and halftone the photos
-bin/vox.py szene  projekt/     # render the scene (no audio)
-bin/vox.py ton    projekt/     # mix voice and bed, normalise
-bin/vox.py bauen  projekt/     # all of the above
+bin/vox.py neu    projekt/       # scaffold from the example
+
+# build a scene from a spec
+bin/vox.py bilder projekt/       # cut out and halftone the photos
+bin/vox.py szene  projekt/       # render the scene
+
+# or cut existing footage
+bin/vox.py schnitt    projekt/   # strip filler words and dead air
+bin/vox.py untertitel projekt/   # burn captions
+
+bin/vox.py ton    projekt/       # polish audio, bed, normalise
+bin/vox.py bauen  projekt/       # whichever path the spec implies
 ```
+
+`"video": {"quelle": "raw.mp4"}` in the spec switches to footage mode.
 
 Everything lives in one `spec.json`. Panels are laid out on a grid in a snake
 path; arrows between them are drawn automatically; `schluss` pulls the camera
@@ -52,6 +61,23 @@ illustration.
 verified, use a label instead of inventing one — or attribute it in the kicker
 ("A study rates …").
 
+## Cutting footage
+
+**Two sources, never one.** The transcript says where speech is; the level
+measurement says where silence is. Many models emit zero-length gaps between
+words, so pauses are not derivable from a transcript — and a level measurement
+mistakes quiet speech for silence. **A cut that touches a word is discarded.**
+
+**Compute the silence threshold from the recording.** A fixed value is a bet on
+the level. On one phone recording the loudest speech peaked at −36 dB; a fixed
+−33 dB classified the whole clip as silence and destroyed it.
+
+**"also" and "genau" are not filler.** At the start of a sentence they carry it;
+removing them wrecks the syntax.
+
+**Remap caption times through the cut.** Otherwise they run ahead by exactly
+the removed duration.
+
 ## Pitfalls
 
 - **A `<svg>` without `width`/`height` is 300×150.** CSS `inset:0` does not
@@ -69,6 +95,11 @@ verified, use a label instead of inventing one — or attribute it in the kicker
   zooms out.
 - **A camera move needs a start *and* an end.** Giving only the target makes
   every move jump.
+- **An ASS `Format:` line must list `SecondaryColour`.** Leave it out and
+  libass misassigns every following field — the text simply never appears, with
+  no error anywhere.
+- **`-ss` before `-i` resets timestamps to zero**, so a subtitle test frame
+  pulled that way shows nothing even when the burn is fine.
 - **Dark styles need inverted photos.** Black halftone dots on a black ground
   are invisible; `vox.py` sets this from the style, `fotos_negativ` overrides.
 

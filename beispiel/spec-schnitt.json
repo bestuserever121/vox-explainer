@@ -1,0 +1,19 @@
+{
+ "name": "episode-01",
+ "stil": "papier",
+ "video": {
+  "quelle": "roh.mp4",
+  "untertitel": true,
+  "gruppe": 3,
+  "pause_max": 0.6,
+  "transkript": {
+   "modell": "/pfad/zu/ggml-large-v3.bin",
+   "sprache": "de"
+  }
+ },
+ "ton": {
+  "bett": "ruhig",
+  "ziel_lufs": -14,
+  "abstand": 20
+ }
+}

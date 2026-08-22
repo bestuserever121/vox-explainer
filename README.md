@@ -51,14 +51,47 @@ Optional but recommended:
 * **whisper.cpp** — turns a voiceover into word timings so you know where each
   beat belongs. You can also write the timings by hand.
 
-## Use
+## Two modes
+
+**Build a scene from a spec** — the collage explainer above.
 
 ```bash
 bin/vox.py neu    my-video/     # create a project from the example
 bin/vox.py bauen  my-video/     # images, scene, audio, export
 ```
 
-Or step by step: `bilder` (prepare photos) · `szene` (render) · `ton` (mix audio).
+**Cut existing footage** — a talking head, a podcast, raw camera material.
+Point the spec at a file and it transcribes, removes filler words and dead air,
+burns captions, and masters the audio.
+
+```jsonc
+{
+  "name": "episode-01",
+  "stil": "papier",
+  "video": {
+    "quelle": "raw.mp4",
+    "untertitel": true,
+    "gruppe": 3,
+    "transkript": { "modell": "/path/ggml-large-v3.bin", "sprache": "de" }
+  },
+  "ton": { "bett": "ruhig", "ziel_lufs": -14 }
+}
+```
+
+```bash
+bin/vox.py bauen my-video/      # cut, caption, mix, normalise
+```
+
+The cut uses **two sources, not one**: the transcript says where speech *is*,
+the level measurement says where silence is. Neither is trustworthy alone —
+many models report zero-length gaps between words, and a level measurement
+mistakes quiet speech for silence. A cut that would touch a word is discarded.
+
+The silence threshold is computed from the recording itself. A fixed threshold
+is a bet on the level: on one phone recording the loudest speech peaked at
+−36 dB, so a fixed −33 dB would have classified the entire clip as silence.
+
+Steps individually: `bilder` · `szene` · `schnitt` · `untertitel` · `ton`.
 
 ## The spec
 

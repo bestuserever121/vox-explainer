@@ -13,18 +13,36 @@ import argparse, json, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 
+def whisper_finden(vorgabe=None):
+    """whisper-cli suchen. Nach dem Bauen liegt es meist nicht im PATH, sondern
+    im Build-Ordner - deshalb die ueblichen Orte mitpruefen."""
+    import os
+    orte = [vorgabe, os.environ.get("WHISPER_CLI"), "whisper-cli", "main",
+            Path.home() / ".local/src/whisper.cpp/build/bin/whisper-cli",
+            Path.home() / "whisper.cpp/build/bin/whisper-cli",
+            Path.home() / "src/whisper.cpp/build/bin/whisper-cli",
+            "/usr/local/bin/whisper-cli", "/opt/whisper.cpp/build/bin/whisper-cli"]
+    for o in orte:
+        if not o:
+            continue
+        gefunden = shutil.which(str(o)) or (str(o) if Path(o).exists() else None)
+        if gefunden:
+            return gefunden
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("ton")
     ap.add_argument("--modell", required=True)
     ap.add_argument("--sprache", default="auto")
-    ap.add_argument("--whisper", default="whisper-cli")
+    ap.add_argument("--whisper", default=None)
     a = ap.parse_args()
-    bin_ = shutil.which(a.whisper) or a.whisper
-    if not Path(bin_).exists():
-        sys.exit(f"whisper-cli nicht gefunden ({a.whisper}). "
-                 f"Bauen: https://github.com/ggml-org/whisper.cpp")
+    bin_ = whisper_finden(a.whisper)
+    if not bin_:
+        sys.exit("whisper-cli nicht gefunden. Pfad ueber --whisper oder WHISPER_CLI "
+                 "setzen.\nBauen: https://github.com/ggml-org/whisper.cpp")
     with tempfile.TemporaryDirectory() as tmp:
         wav = Path(tmp) / "ton.wav"
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", a.ton, "-ac", "1",

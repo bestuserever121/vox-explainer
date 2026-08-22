@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 """vox - Erklaervideos im Papier-Collagen-Stil aus einer Spec-Datei.
 
-    vox.py neu   mein-video/        Projekt mit Beispiel anlegen
+    vox.py neu    mein-video/       Projekt mit Beispiel anlegen
+
+  Szene aus einer Spec bauen:
     vox.py bilder mein-video/       Fotos freistellen und rastern
     vox.py szene  mein-video/       Szene rendern (ohne Ton)
-    vox.py ton    mein-video/       Stimme und Musikbett mischen
+
+  Vorhandenes Material schneiden:
+    vox.py schnitt mein-video/      Fuellwoerter und totes Band entfernen
+    vox.py untertitel mein-video/   Untertitel einbrennen
+
+  Beides:
+    vox.py ton    mein-video/       Ton polieren, Bett drunter, normalisieren
     vox.py bauen  mein-video/       alles nacheinander
 
 Gerendert wird mit HyperFrames (github.com/heygen-com/hyperframes). Pfad wird
@@ -127,6 +135,77 @@ def gsap_da():
     return None
 
 
+# -------------------------------------------------------------- Material ----
+def worte_holen(projekt: Path, spec, quelle: Path) -> Path | None:
+    """Wortzeiten besorgen - aus einer vorhandenen Datei oder per whisper."""
+    ziel = projekt / "arbeit" / "worte.json"
+    ziel.parent.mkdir(exist_ok=True)
+    if ziel.exists():
+        return ziel
+    eigene = projekt / "worte.json"
+    if eigene.exists():
+        shutil.copy(eigene, ziel); return ziel
+    tr = (spec.get("video") or {}).get("transkript") or {}
+    modell = tr.get("modell") or os.environ.get("WHISPER_MODELL")
+    if not modell or not Path(modell).exists():
+        print("  ohne Transkript (kein Modell) - es wird nur nach Pegel geschnitten")
+        return None
+    befehl = [sys.executable, HIER / "transkript.py", quelle,
+              "--modell", modell, "--sprache", tr.get("sprache", "auto")]
+    if tr.get("whisper"):
+        befehl += ["--whisper", tr["whisper"]]
+    p = subprocess.run([str(c) for c in befehl], capture_output=True, text=True)
+    if p.returncode:
+        print(f"  Transkript fehlgeschlagen: {p.stderr.strip().splitlines()[-1][:70]}")
+        return None
+    ziel.write_text(p.stdout, encoding="utf-8")
+    return ziel
+
+
+def schnitt(projekt: Path, spec):
+    v = spec.get("video") or {}
+    if not v.get("quelle"):
+        sys.exit('In der Spec fehlt "video": {"quelle": "roh.mp4"}')
+    quelle = projekt / v["quelle"]
+    if not quelle.exists():
+        sys.exit(f"Quelle fehlt: {quelle}")
+    aus = projekt / "aus"; aus.mkdir(exist_ok=True)
+    ziel = aus / "schnitt.mp4"
+    worte = worte_holen(projekt, spec, quelle)
+    befehl = [sys.executable, HIER / "schnitt.py", quelle, "--aus", ziel]
+    if worte:
+        befehl += ["--worte", worte]
+    if v.get("behalte_fueller"):
+        befehl.append("--behalte-fueller")
+    if v.get("pause_max"):
+        befehl += ["--pause-max", str(v["pause_max"])]
+    p = subprocess.run([str(c) for c in befehl])
+    if p.returncode:
+        sys.exit("Schnitt fehlgeschlagen")
+    return ziel
+
+
+def untertitel(projekt: Path, spec):
+    v = spec.get("video") or {}
+    aus = projekt / "aus"
+    quelle = aus / "schnitt.mp4"
+    if not quelle.exists():
+        quelle = projekt / v.get("quelle", "")
+    if not quelle.exists():
+        sys.exit("Weder aus/schnitt.mp4 noch video.quelle vorhanden")
+    worte = worte_holen(projekt, spec, quelle)
+    if not worte:
+        sys.exit("Ohne Wortzeiten keine Untertitel - Modell in video.transkript.modell setzen")
+    ziel = aus / "untertitelt.mp4"
+    p = subprocess.run([str(c) for c in
+                        [sys.executable, HIER / "untertitel.py", quelle, "--worte", worte,
+                         "--aus", ziel, "--stil", spec.get("stil", "papier"),
+                         "--gruppe", str(v.get("gruppe", 3))]])
+    if p.returncode:
+        sys.exit("Untertitel fehlgeschlagen")
+    return ziel
+
+
 # ------------------------------------------------------------------- Ton ----
 STIMMUNGEN = {   # Akkord in Hertz, tief genug, dass Sprache darueber frei bleibt
     "ruhig":    [110.00, 164.81, 220.00, 329.63],
@@ -152,6 +231,13 @@ def bett_bauen(stimmung, dauer, ziel: Path):
           "-map", "[aus]", "-c:a", "libmp3lame", "-b:a", "192k", ziel])
 
 
+def hat_ton(datei) -> bool:
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0",
+                        "-show_entries", "stream=codec_type", "-of", "csv=p=0", str(datei)],
+                       capture_output=True, text=True)
+    return "audio" in r.stdout
+
+
 def lautheit(datei) -> float:
     p = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(datei),
                         "-af", "ebur128=peak=true", "-f", "null", "-"],
@@ -164,14 +250,19 @@ def lautheit(datei) -> float:
 
 def ton(projekt: Path, spec, video: Path):
     t = spec.get("ton") or {}
-    stimme = t.get("stimme")
     aus = projekt / "aus"
     ziel = aus / (spec.get("name", "film") + ".mp4")
-    if not stimme:
+    # Bei geschnittenem Material steckt die Stimme schon im Video - dann ist
+    # die eigene Tonspur die Quelle, nicht eine separate Datei.
+    if t.get("stimme"):
+        stimm_weg = projekt / t["stimme"]
+        if not stimm_weg.exists():
+            sys.exit(f"Stimme fehlt: {stimm_weg}")
+    elif hat_ton(video):
+        stimm_weg = video
+        print("  Stimme kommt aus der Tonspur des Videos")
+    else:
         shutil.copy(video, ziel); print(f"  ohne Ton\n\n  {ziel}"); return ziel
-    stimm_weg = projekt / stimme
-    if not stimm_weg.exists():
-        sys.exit(f"Stimme fehlt: {stimm_weg}")
 
     poliert = projekt / "arbeit" / "stimme.wav"
     lauf(["ffmpeg", "-v", "error", "-y", "-i", stimm_weg,
@@ -235,7 +326,8 @@ def neu(projekt: Path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("befehl", choices=["neu", "bilder", "szene", "ton", "bauen"])
+    ap.add_argument("befehl", choices=["neu", "bilder", "szene", "schnitt",
+                                       "untertitel", "ton", "bauen"])
     ap.add_argument("projekt")
     a = ap.parse_args()
     projekt = Path(a.projekt).resolve()
@@ -243,15 +335,25 @@ def main():
     if a.befehl == "neu":
         return neu(projekt)
     spec = spec_lesen(projekt)
-    if a.befehl in ("bilder", "bauen"):
+    material = bool((spec.get("video") or {}).get("quelle"))
+
+    if a.befehl == "bilder" or (a.befehl == "bauen" and not material):
         print("Bilder aufbereiten ..."); bilder(projekt, spec)
-    if a.befehl in ("szene", "bauen"):
-        print("Szene rendern ..."); v = szene(projekt, spec)
+    if a.befehl == "szene" or (a.befehl == "bauen" and not material):
+        print("Szene rendern ..."); szene(projekt, spec)
+    if a.befehl == "schnitt" or (a.befehl == "bauen" and material):
+        print("Rohschnitt ..."); schnitt(projekt, spec)
+    if a.befehl == "untertitel" or (a.befehl == "bauen" and material
+                                    and (spec.get("video") or {}).get("untertitel")):
+        print("Untertitel ..."); untertitel(projekt, spec)
+
     if a.befehl in ("ton", "bauen"):
-        v = projekt / "aus" / "szene.mp4"
-        if not v.exists():
-            sys.exit("aus/szene.mp4 fehlt - erst `szene` laufen lassen")
-        print("Ton mischen ..."); ton(projekt, spec, v)
+        # Die zuletzt entstandene Stufe ist die Grundlage.
+        stufen = ["untertitelt.mp4", "schnitt.mp4", "szene.mp4"]
+        v = next((projekt / "aus" / s for s in stufen if (projekt / "aus" / s).exists()), None)
+        if not v:
+            sys.exit("Nichts zu vertonen - erst `szene` oder `schnitt` laufen lassen")
+        print(f"Ton mischen (Grundlage {v.name}) ..."); ton(projekt, spec, v)
 
 
 if __name__ == "__main__":

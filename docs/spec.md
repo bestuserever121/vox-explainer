@@ -125,3 +125,26 @@ A pitch/area with scattered dots — spread, reach, coverage.
 The bed level is derived by measuring both the voice and the bed, not from a
 fixed dB value — a fixed value is a guess that misses whenever the recording
 level changes.
+
+
+## Footage mode (`video`)
+
+Point the spec at existing material and the panels are ignored — the tool cuts
+that file instead.
+
+| Key | Meaning |
+|---|---|
+| `quelle` | the raw file, relative to the project |
+| `untertitel` | burn captions (needs a transcript) |
+| `gruppe` | words per caption card (default 3) |
+| `pause_max` | pauses longer than this are shortened (default 0.6 s) |
+| `behalte_fueller` | keep filler words |
+| `transkript.modell` | path to a whisper.cpp model |
+| `transkript.sprache` | language code, or `auto` |
+| `transkript.whisper` | path to `whisper-cli` if it is not on `PATH` |
+
+Word timings can also be supplied directly as `worte.json` in the project —
+a list of `{"wort", "von", "bis"}`. Then no transcription runs.
+
+Without any transcript the cut falls back to level only: dead air is shortened,
+filler words are kept, and captions are unavailable.
