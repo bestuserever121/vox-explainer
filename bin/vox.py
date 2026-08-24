@@ -157,6 +157,13 @@ def szene(projekt: Path, spec):
         spec_js += ("\nwindow.WORTE = "
                     + wweg.read_text(encoding="utf-8").strip().rstrip(";") + ";")
         print("  Wortzeiten: worte.json")
+    # Satzzeiten: der verlaesslichere Anker. Ein einzelnes Wort kann die
+    # Erkennung verhoeren; Satzgrenzen kommen aus dem geschriebenen Text.
+    sweg = projekt / "saetze.json"
+    if sweg.exists():
+        spec_js += ("\nwindow.SAETZE = "
+                    + sweg.read_text(encoding="utf-8").strip().rstrip(";") + ";")
+        print("  Satzzeiten: saetze.json")
     bweg = projekt / "bezug.json"
     if bweg.exists():
         # Welche Fakten diese Szene meint - damit eine Vorlage allgemein

@@ -359,6 +359,26 @@ body { font-family:"${p.text}", system-ui, sans-serif; color:${p.tinte}; }
     return 1 - d[a.length][b.length] / Math.max(a.length, b.length);
   }
 
+  /* --- Saetze statt Woerter ----------------------------------------------
+   * Der verlaesslichere Anker. Ein Satz ist eine Aussage, und das Bild zeigt
+   * eine Aussage - die Einheit passt. Vor allem aber kann sich die
+   * Erkennung nicht verhoeren: die Grenzen kommen aus dem geschriebenen
+   * Text, nur die Zeiten aus der Spur.
+   */
+  function satz(nr) {
+    const s = window.SAETZE || [];
+    if (!s.length) throw new Error("keine Satzzeiten - saetze.json fehlt");
+    const g = s[nr < 0 ? s.length + nr : nr];
+    if (!g) throw new Error(`Satz ${nr} gibt es nicht (${s.length} Saetze)`);
+    return g.von;
+  }
+  function satzEnde(nr) {
+    const s = window.SAETZE || [];
+    const g = s[nr < 0 ? s.length + nr : nr];
+    if (!g) throw new Error(`Satz ${nr} gibt es nicht (${s.length} Saetze)`);
+    return g.bis;
+  }
+
   function zeit(muster, opt) {
     // Mehrere Schreibweisen erlaubt: zeit(["fast", "über"]) nimmt die erste,
     // die vorkommt. Vorlagen formulieren nicht immer gleich.
@@ -424,7 +444,7 @@ body { font-family:"${p.text}", system-ui, sans-serif; color:${p.tinte}; }
   window.vox = {
     zeit, zeitEnde,
     stil: stilSchreiben, STILE,
-    el, welt, fahrt, ueberblick, pfeil,
+    el, welt, fahrt, ueberblick, pfeil, satz, satzEnde,
     tween, tippen, zaehlen, streuwert,
     fertig: verdrahten,
   };
