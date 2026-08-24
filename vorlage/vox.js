@@ -342,6 +342,23 @@ body { font-family:"${p.text}", system-ui, sans-serif; color:${p.tinte}; }
    * Stattdessen fragt die Szene nach dem Wort:  zeit("Fünffache")
    * Die Wortzeiten liegen als window.WORTE bereit.
    */
+  /* Aehnlichkeit zweier Woerter, 0 bis 1. Reicht fuer Verhoerer der
+     Spracherkennung - kein Rechtschreibpruefer. */
+  function aehnlich(a, b) {
+    if (a === b) return 1;
+    if (!a.length || !b.length) return 0;
+    const d = [];
+    for (let i = 0; i <= a.length; i++) d[i] = [i];
+    for (let j = 0; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1,
+                           d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      }
+    }
+    return 1 - d[a.length][b.length] / Math.max(a.length, b.length);
+  }
+
   function zeit(muster, opt) {
     // Mehrere Schreibweisen erlaubt: zeit(["fast", "über"]) nimmt die erste,
     // die vorkommt. Vorlagen formulieren nicht immer gleich.
@@ -358,9 +375,22 @@ body { font-family:"${p.text}", system-ui, sans-serif; color:${p.tinte}; }
     }
     const norm = (x) => String(x).toLowerCase().replace(/[^\wäöüß]/g, "");
     const ziel = norm(muster);
-    const treffer = w.filter((x) => norm(x.wort) === ziel);
+    let treffer = w.filter((x) => norm(x.wort) === ziel);
     const nr = (opt && opt.nr) || 0;
-    const gefunden = treffer[nr];
+    if (!treffer[nr]) {
+      // Die Erkennung verhoert sich: "Raten" wird zu "Ratten", "Kuehlschrank"
+      // zu "Kuehl Schrank". Ein Anker darf daran nicht scheitern - ein
+      // aehnliches Wort an der richtigen Stelle ist besser als eine
+      // abgebrochene Szene. Nur wenn gar nichts passt, wird geworfen.
+      const nah = w.map((x) => ({ x, g: aehnlich(norm(x.wort), ziel) }))
+                   .filter((c) => c.g >= 0.72)
+                   .sort((a, b) => b.g - a.g);
+      if (nah.length) {
+        console.warn(`zeit("${muster}") -> "${nah[0].x.wort}" (unscharf)`);
+        treffer = [nah[0].x];
+      }
+    }
+    const gefunden = treffer[nr] || treffer[0];
     if (!gefunden) {
       // Nicht still 0 liefern - sonst rutscht ein Element an den Anfang und
       // niemand sieht, woran es lag.
@@ -380,8 +410,13 @@ body { font-family:"${p.text}", system-ui, sans-serif; color:${p.tinte}; }
     }
     const w = window.WORTE || [];
     const norm = (x) => String(x).toLowerCase().replace(/[^\wäöüß]/g, "");
-    const treffer = w.filter((x) => norm(x.wort) === norm(muster));
-    const g = treffer[(opt && opt.nr) || 0];
+    let treffer = w.filter((x) => norm(x.wort) === norm(muster));
+    if (!treffer[(opt && opt.nr) || 0]) {
+      const nah = w.map((x) => ({ x, g: aehnlich(norm(x.wort), norm(muster)) }))
+                   .filter((c) => c.g >= 0.72).sort((a, b) => b.g - a.g);
+      if (nah.length) treffer = [nah[0].x];
+    }
+    const g = treffer[(opt && opt.nr) || 0] || treffer[0];
     if (!g) throw new Error(`Wort nicht in der Sprachspur: "${muster}"`);
     return g.bis + ((opt && opt.plus) || 0);
   }

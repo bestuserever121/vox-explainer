@@ -207,8 +207,11 @@ def main():
     # war die Netflix-Regel (Umbruch entlang grammatischer Einheiten) bei
     # vielen deutschen Saetzen gar nicht erfuellbar. Etwas kleiner, dafuer
     # richtig gebrochen.
-    groesse = max(28, round(h * 0.040))
-    rand_unten = round(h * 0.14)          # innerhalb der Bedienleisten der Apps
+    # An der Breite messen, nicht an der Hoehe. Beim Splitscreen ist das Bild
+    # nur noch 1240 statt 1920 hoch - die Schrift wuerde mitschrumpfen,
+    # obwohl das Bild genauso breit bleibt.
+    groesse = max(28, round(b * 0.072))
+    rand_unten = round(h * 0.115)          # innerhalb der Bedienleisten der Apps
 
     zeilen = [
         "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {b}", f"PlayResY: {h}",
