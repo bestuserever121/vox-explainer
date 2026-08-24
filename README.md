@@ -118,6 +118,59 @@ is a bet on the level: on one phone recording the loudest speech peaked at
 
 Steps individually: `bilder` · `szene` · `schnitt` · `untertitel` · `ton`.
 
+## Timing comes from the voice, not from a stopwatch
+
+Write the script first; the scene hangs off its **sentences**. `bin/saetze.py`
+lays the written text over the recognised word times and writes `saetze.json`;
+the scene asks for a sentence number:
+
+```js
+block({ bei: vox.satz(7), aus: vox.satz(10) - 0.15, … });
+vox.zaehlen(zahl, wert, vox.satz(7) + 1.1, 0.7, 1);
+```
+
+Anchoring on individual **words** (`vox.zeit("Genau")`) is still supported but
+inverts the dependency: the script ends up written so the scene can find its
+anchor words. It also breaks when recognition mishears one of them.
+
+**Take sentence boundaries from the written text, never from recognition.**
+Recognition swallows punctuation and merges sentences — and then every index
+after that point is off by one, which silently misplaces half the scene. Pass
+the authored list as `rede.json`:
+
+```bash
+bin/saetze.py worte.json sprecher.txt saetze.json rede.json
+```
+
+Words with no counterpart in the recognition get their time proportionally from
+the gap. An approximate time beats no time.
+
+## Subtitles follow the Netflix style guide
+
+`bin/umbruch.py` implements the Netflix Timed Text Style Guide: two lines,
+17 characters per second, 5/6 s to 7 s on screen, and — the part that actually
+takes work — **line breaks along grammatical units**.
+
+For German that means an article, preposition, possessive or number may not end
+a line, a unit may not begin one, and a personal pronoun stays with its verb.
+Otherwise you get `5,2 / ct bekommen`, splitting a figure from its unit.
+
+Every candidate seam is scored rather than taking the first that fits. Cards
+that cannot be broken grammatically onto two lines are split into more cards.
+
+The character limit is **derived from frame width and font size**, not
+configured. Set it too high and libass wraps a second time, undoing the work.
+
+## When a scene throws
+
+A scene that throws stops building its DOM — but the renderer keeps going and
+produces a full-length video with half a scene and no error anywhere. A guard
+paints the error into the frame instead:
+
+```bash
+ffmpeg -ss 1 -i work/scene.mp4 -frames:v 1 error.png
+```
+
 ## The spec
 
 ```jsonc

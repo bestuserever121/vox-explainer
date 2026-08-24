@@ -17,6 +17,8 @@ bin/vox.py szene  projekt/       # render the scene
 
 # or cut existing footage
 bin/vox.py schnitt    projekt/   # strip filler words and dead air
+bin/saetze.py …                  # sentence boundaries with times
+bin/umbruch.py                   # Netflix-conformant subtitle line breaking
 bin/vox.py untertitel projekt/   # burn captions
 
 bin/vox.py ton    projekt/       # polish audio, bed, normalise
@@ -78,9 +80,16 @@ image instead of guessing hex values.
 **One claim per panel.** A panel that carries two statements needs splitting.
 Six to nine panels carry a 45-second voiceover comfortably.
 
-**Time the panels to the words.** Transcribe the voiceover with
-`bin/transkript.py`, then set each panel's `bei` to the moment its claim starts.
-A panel that lands even half a second late reads as unrelated.
+**Write the script first, then hang the picture off its sentences.** Transcribe
+the voiceover with `bin/transkript.py`, build `saetze.json` with
+`bin/saetze.py`, then anchor each panel with `vox.satz(n)`. A panel that lands
+even half a second late reads as unrelated.
+
+Anchoring on single words (`vox.zeit("Genau")`) inverts the dependency — the
+script ends up written so the scene can find its anchor words — and breaks the
+moment recognition mishears one. Take sentence boundaries from the **written**
+text (`rede.json`), never from recognition: it swallows punctuation and merges
+sentences, and every index after that point is off by one.
 
 **Show the thing, do not label it.** If the voiceover names something, the
 picture has to do it. A card with the word written on it is an caption, not an
@@ -134,6 +143,15 @@ the removed duration.
   no error anywhere.
 - **`-ss` before `-i` resets timestamps to zero**, so a subtitle test frame
   pulled that way shows nothing even when the burn is fine.
+- **A scene that throws still produces a video.** The renderer keeps going and
+  delivers full length with half a scene, no error anywhere. A guard paints the
+  error into the frame — pull one frame to read it.
+- **Subtitle line breaks need grammar, not just a width.** An article,
+  preposition or number must not end a line; `5,2 / ct` splits a figure from its
+  unit. `bin/umbruch.py` scores every seam.
+- **Derive the subtitle character limit from frame width and font size.** Set it
+  too high and libass wraps a second time, undoing a correct break. Too low and
+  the rule becomes unsatisfiable in German — then shrink the font, not the rule.
 - **Dark styles need inverted photos.** Black halftone dots on a black ground
   are invisible; `vox.py` sets this from the style, `fotos_negativ` overrides.
 
