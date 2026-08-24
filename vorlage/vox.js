@@ -102,6 +102,25 @@
       vignette: "radial-gradient(ellipse at 50% 45%, transparent 50%, rgba(2,16,30,.5) 100%)",
     },
 
+    // Hausstil von Nomobo, aus nomobo.de gezogen: Akzent #FF4500, dunkler
+    // Grund #07090E, Poppins bis 700, Pillen als Formensignatur.
+    nomobo: {
+      palette: { papier: "#07090E", tinte: "#FFFFFF", gedeckt: "#8A8F98",
+                 gelb: "#FF7040", koralle: "#FF4500", lila: "#D93A00", gold: "#FF8C42" },
+      schrift: { anzeige: "Poppins", text: "Poppins" },
+      // Kein Druckversatz - die Marke ist digital, nicht Papier.
+      schatten_gross: "0 18px 60px rgba(0,0,0,.55)",
+      schatten_mittel: "0 12px 40px rgba(0,0,0,.5)",
+      korn: { deckung: 0.06, mischen: "screen" },
+      negativ: true,
+      struktur: (B, H) => `
+        opacity:1; background:
+        radial-gradient(circle 900px at 12% 8%, rgba(255,69,0,.30), transparent 68%),
+        radial-gradient(circle 760px at 88% 78%, rgba(255,112,64,.16), transparent 70%);
+        background-size:${B}px ${H}px;`,
+      vignette: "radial-gradient(ellipse at 50% 45%, transparent 46%, rgba(0,0,0,.55) 100%)",
+    },
+
     riso: {
       palette: { papier: "#f4efe2", tinte: "#1b1b1b", gedeckt: "#8a7f6d",
                  gelb: "#ffd400", koralle: "#ff4b3e", lila: "#3d5afe", gold: "#ff8a00" },
@@ -157,9 +176,11 @@ body { font-family:"${p.text}", system-ui, sans-serif; color:${p.tinte}; }
          align-items:center; justify-content:center; gap:20px; padding:60px; }
 .kicker { font-weight:700; font-size:38px; letter-spacing:.20em;
           text-transform:uppercase; color:${p.gedeckt}; }
-.gross { font-family:"${p.anzeige}"; font-size:170px; line-height:.94; text-align:center;
+.gross { font-family:"${p.anzeige}"; font-weight:700; font-size:170px;
+         line-height:.94; text-align:center; letter-spacing:-.03em;
          text-shadow:${stil.schatten_gross}; }
-.mittel { font-family:"${p.anzeige}"; font-size:120px; line-height:1; text-align:center;
+.mittel { font-family:"${p.anzeige}"; font-weight:700; font-size:120px;
+          line-height:1.06; text-align:center; letter-spacing:-.025em;
           text-shadow:${stil.schatten_mittel}; }
 .unter { font-weight:700; font-size:56px; text-align:center; max-width:1400px; line-height:1.28; }
 .unter mark { background:${p.gelb}; color:${stil.negativ ? "#111" : "inherit"};
@@ -313,7 +334,60 @@ body { font-family:"${p.text}", system-ui, sans-serif; color:${p.tinte}; }
     return p;
   }
 
+  /* --- Zeitanker ---------------------------------------------------------
+   * Eine Szene soll nicht auf Sekunden festgenagelt sein. Jede neue Stimme
+   * verschiebt alles, und dann muessen zwanzig Zeitstempel von Hand nach -
+   * das ist der eigentliche Engpass beim Neubauen.
+   *
+   * Stattdessen fragt die Szene nach dem Wort:  zeit("Fünffache")
+   * Die Wortzeiten liegen als window.WORTE bereit.
+   */
+  function zeit(muster, opt) {
+    // Mehrere Schreibweisen erlaubt: zeit(["fast", "über"]) nimmt die erste,
+    // die vorkommt. Vorlagen formulieren nicht immer gleich.
+    if (Array.isArray(muster)) {
+      for (const m of muster) {
+        try { return zeit(m, opt); } catch (e) { /* naechste probieren */ }
+      }
+      throw new Error("keine dieser Schreibweisen in der Sprachspur: " + muster.join(", "));
+    }
+    const w = window.WORTE || [];
+    if (!w.length) {
+      console.warn("keine Wortzeiten - zeit() liefert 0");
+      return 0;
+    }
+    const norm = (x) => String(x).toLowerCase().replace(/[^\wäöüß]/g, "");
+    const ziel = norm(muster);
+    const treffer = w.filter((x) => norm(x.wort) === ziel);
+    const nr = (opt && opt.nr) || 0;
+    const gefunden = treffer[nr];
+    if (!gefunden) {
+      // Nicht still 0 liefern - sonst rutscht ein Element an den Anfang und
+      // niemand sieht, woran es lag.
+      throw new Error(`Wort nicht in der Sprachspur: "${muster}"`
+                      + (treffer.length ? ` (nur ${treffer.length} Vorkommen)` : ""));
+    }
+    return gefunden.von + ((opt && opt.plus) || 0);
+  }
+
+  /* Ende des Wortes - praktisch fuer "danach ausblenden". */
+  function zeitEnde(muster, opt) {
+    if (Array.isArray(muster)) {
+      for (const m of muster) {
+        try { return zeitEnde(m, opt); } catch (e) { /* naechste */ }
+      }
+      throw new Error("keine dieser Schreibweisen in der Sprachspur: " + muster.join(", "));
+    }
+    const w = window.WORTE || [];
+    const norm = (x) => String(x).toLowerCase().replace(/[^\wäöüß]/g, "");
+    const treffer = w.filter((x) => norm(x.wort) === norm(muster));
+    const g = treffer[(opt && opt.nr) || 0];
+    if (!g) throw new Error(`Wort nicht in der Sprachspur: "${muster}"`);
+    return g.bis + ((opt && opt.plus) || 0);
+  }
+
   window.vox = {
+    zeit, zeitEnde,
     stil: stilSchreiben, STILE,
     el, welt, fahrt, ueberblick, pfeil,
     tween, tippen, zaehlen, streuwert,

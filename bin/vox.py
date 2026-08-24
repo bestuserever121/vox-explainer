@@ -40,6 +40,24 @@ def spec_lesen(projekt: Path):
     return json.loads(weg.read_text(encoding="utf-8"))
 
 
+# Ein Fehler im Szenen-Skript bricht die Szene ab, aber nicht den Rendervorgang:
+# HyperFrames kodiert brav weiter und liefert ein Video vollen Umfangs, in dem
+# nur die Haelfte des Aufbaus steht. Genau so ist ein Reel entstanden, bei dem
+# ein einziges falsches Ankerwort alles nach der Uhr verschluckt hat - ohne
+# eine Zeile Fehlermeldung. Deshalb malt die Wache den Fehler ins Bild.
+WACHE = """<script>
+window.addEventListener("error", function (e) {
+  var d = document.createElement("div");
+  d.setAttribute("style", "position:fixed;inset:0;z-index:999999;background:#B00020;"
+    + "color:#fff;font:700 34px/1.4 ui-monospace,monospace;padding:70px;"
+    + "white-space:pre-wrap;word-break:break-word");
+  d.textContent = "SZENE ABGEBROCHEN\\n\\n" + e.message + "\\n\\n"
+    + (e.filename || "") + ":" + (e.lineno || "");
+  (document.body || document.documentElement).appendChild(d);
+});
+</script>
+"""
+
 def hyperframes_finden():
     for p in (os.environ.get("HYPERFRAMES"),
               Path.home() / "projects/hyperframes/packages/cli/bin/hyperframes.mjs",
@@ -118,6 +136,12 @@ def szene(projekt: Path, spec):
               .replace('data-height="1080"', f'data-height="{h}"'))
     # Eine eigene Szene im Projekt schlaegt die mitgelieferte Rasteranordnung.
     # Genau dafuer ist die Trennung da: raster.js ist EIN Weg, nicht DER Weg.
+    # Geprueft aufgeloeste Fakten, falls vorhanden. Sie stehen VOR der Szene,
+    # damit sie beim Aufbau schon da sind.
+    faktenweg = projekt / "fakten.js"
+    fakten = faktenweg.read_text(encoding="utf-8") if faktenweg.exists() else ""
+    if fakten:
+        print("  Fakten: aus fakten.js (geprueft aufgeloest)")
     eigen = projekt / "szene.js"
     if eigen.exists():
         anordnung = eigen.read_text(encoding="utf-8")
@@ -126,14 +150,40 @@ def szene(projekt: Path, spec):
         anordnung = (VORLAGE / "raster.js").read_text(encoding="utf-8")
         print("  Anordnung: Raster (vorlage/raster.js)")
     spec_js = "window.SPEC = " + json.dumps(spec, ensure_ascii=False, indent=1) + ";"
+    # Wortzeiten mitgeben, damit die Szene nach Woertern fragen kann statt
+    # nach Sekunden. Ohne das ist jede neue Sprachspur Handarbeit.
+    wweg = projekt / "worte.json"
+    if wweg.exists():
+        spec_js += ("\nwindow.WORTE = "
+                    + wweg.read_text(encoding="utf-8").strip().rstrip(";") + ";")
+        print("  Wortzeiten: worte.json")
+    bweg = projekt / "bezug.json"
+    if bweg.exists():
+        # Welche Fakten diese Szene meint - damit eine Vorlage allgemein
+        # bleiben kann statt Schluessel fest einzubauen.
+        spec_js += "\nwindow.BEZUG = " + bweg.read_text(encoding="utf-8").strip() + ";"
     huelle = huelle.replace(
         '<script src="spec.js"></script>\n<script src="vox.js"></script>\n'
         '<script src="szene.js"></script>',
-        f"<script>\n{spec_js}\n</script>\n<script>\n{laufzeit}\n</script>\n"
-        f"<script>\n{anordnung}\n</script>")
+        WACHE
+        + f"<script>\n{spec_js}\n</script>\n<script>\n{laufzeit}\n</script>\n"
+        + (f"<script>\n{fakten}\n</script>\n" if fakten else "")
+        + f"<script>\n{anordnung}\n</script>")
     shutil.copy(gsap, arbeit / "gsap.min.js")
+    # Bilddateien aus dem Projekt mitnehmen. Ohne das laeuft ein
+    # url('foto.jpg') in der Szene ins Leere - der Renderer meldet nichts,
+    # das Bild ist einfach nicht da.
+    for q in projekt.iterdir():
+        if q.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".svg"):
+            shutil.copy(q, arbeit / q.name)
     (arbeit / "index.html").write_text(huelle, encoding="utf-8")
     shutil.copy(gsap, arbeit / "gsap.min.js")
+    # Bilddateien aus dem Projekt mitnehmen. Ohne das laeuft ein
+    # url('foto.jpg') in der Szene ins Leere - der Renderer meldet nichts,
+    # das Bild ist einfach nicht da.
+    for q in projekt.iterdir():
+        if q.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp", ".svg"):
+            shutil.copy(q, arbeit / q.name)
     (arbeit / "hyperframes.json").write_text('{"paths":{"assets":"."}}', encoding="utf-8")
 
     aus = projekt / "aus"; aus.mkdir(exist_ok=True)
