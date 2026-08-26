@@ -189,6 +189,9 @@ def main():
     ap.add_argument("--text", help="Sprechertext - liefert die Schreibweise, "
                                    "die Erkennung nur die Zeiten")
     ap.add_argument("--ersetzen", help="JSON mit Schreibweisen, z.B. {\"7,7\": \"7,70\"}")
+    ap.add_argument("--versatz", type=float, default=0.0,
+                    help="Sekunden, um die die Sprachspur spaeter beginnt "
+                         "(z.B. ein Vorspann davor)")
     ap.add_argument("--stil", default="papier")
     ap.add_argument("--schrift", default="Adwaita Sans")
     a = ap.parse_args()
@@ -201,6 +204,10 @@ def main():
         worte = durch_den_schnitt(worte, json.loads(liste.read_text(encoding="utf-8"))["abschnitte"])
         print(f"  Wortzeiten durch den Schnitt gerechnet ({vorher} -> {len(worte)})")
 
+    if a.versatz:
+        for w in worte:
+            w["von"] += a.versatz
+            w["bis"] += a.versatz
     b, h = masse(video)
     st = STILE.get(a.stil, STILE["papier"])
     # 0.048 sah gut aus, liess aber nur 20 Zeichen je Zeile zu - und damit

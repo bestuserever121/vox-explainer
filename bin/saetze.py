@@ -15,7 +15,7 @@ verschluckt Satzzeichen und zieht Saetze zusammen - dann verschiebt sich
 jede Satznummer dahinter, und die halbe Szene sitzt falsch. Wer den Text
 geschrieben hat, kennt seine Saetze; er gibt sie in rede.json vor.
 
-    saetze.py <worte.json> <sprecher.txt> <saetze.json> [rede.json]
+    saetze.py <worte.json> <sprecher.txt> <saetze.json> [rede.json] [--versatz N]
 """
 
 import difflib, json, pathlib, re, sys
@@ -101,17 +101,31 @@ def bauen(worte, sprechertext, rede=None):
 
 
 def main():
-    if len(sys.argv) not in (4, 5):
+    # Der Versatz wird beim Schreiben aufgeschlagen, nicht in worte.json
+    # hineingerechnet. Sonst schiebt jeder erneute Lauf noch einmal - und
+    # die Szene sitzt beim zweiten Bauen zehn Sekunden zu spaet.
+    versatz = 0.0
+    argv = list(sys.argv)
+    if "--versatz" in argv:
+        i = argv.index("--versatz")
+        versatz = float(argv[i + 1]); del argv[i:i + 2]
+    if len(argv) not in (4, 5):
         sys.exit(__doc__.strip().splitlines()[-1])
+    sys.argv = argv
     worte = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
     text = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8")
     rede = None
     if len(sys.argv) == 5 and pathlib.Path(sys.argv[4]).exists():
         rede = json.loads(pathlib.Path(sys.argv[4]).read_text(encoding="utf-8"))
     s = bauen(worte, text, rede)
+    if versatz:
+        for x in s:
+            x["von"] = round(x["von"] + versatz, 3)
+            x["bis"] = round(x["bis"] + versatz, 3)
     pathlib.Path(sys.argv[3]).write_text(
         json.dumps(s, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"  {len(s)} Saetze mit Zeiten"
+          + (f", +{versatz}s Versatz" if versatz else "")
           + (" (aus rede.json)" if rede else " (nach Satzzeichen geraten)"))
 
 
